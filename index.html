@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DaySync</title>
+  <!-- Link to Web App Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <!-- Theme color for address bar -->
+  <meta name="theme-color" content="#3367D6">
+</head>
+<body>
+  <h1>Welcome to DaySync</h1>
+  <p>Track your workout, meals, and work blocks dynamically.</p>
+  <button id="actionBtn">Click me</button>
+
+  <script>
+    // Register the service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('SW registered', reg))
+        .catch(err => console.error('SW registration failed', err));
+    }
+
+    // Simple button action
+    document.getElementById('actionBtn').addEventListener('click', () => {
+      alert('Hello from DaySync!');
+    });
+  </script>
+</body>
+</html>
