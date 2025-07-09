@@ -1,5 +1,4 @@
-// sw.js
-const CACHE_NAME = 'daysync-cache-v2';  // Updated cache version
+const CACHE_NAME = 'daysync-cache-v3';
 const URLsToCache = ['.', 'index.html', 'manifest.json'];
 
 // Install: cache new assets and immediately skip waiting
@@ -16,9 +15,7 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       )
     ).then(() => self.clients.claim())
   );

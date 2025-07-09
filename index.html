@@ -7,8 +7,26 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#3367D6">
   <style>
-    :root { --accent: #3367D6; }
-    body { margin:0; font-family:-apple-system, BlinkMacSystemFont, sans-serif; color:#333; }
+    :root {
+      --accent: #3367D6;
+      --bg: #fff;
+      --text: #333;
+      --field-bg: #fafafa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --accent: #4A90E2;
+        --bg: #111;
+        --text: #eee;
+        --field-bg: #222;
+      }
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
     .header {
       background: var(--accent);
       color: #fff;
@@ -16,55 +34,89 @@
       text-align: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .header h1 { margin:0; font-size:1.5rem; }
-    .header p { margin:0.2rem 0 1rem; font-size:0.9rem; color: rgba(255,255,255,0.8); }
-
-    .container { padding: 0 1rem 4rem; }
+    .header h1 { margin: 0; font-size: 1.5rem; }
+    .header p { margin: 0.2rem 0 0.5rem; font-size: 0.9rem; color: rgba(255,255,255,0.8); }
+    .progress-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.3);
+      width: 100%;
+    }
+    .progress {
+      height: 100%;
+      width: 0%;
+      background: #fff;
+      transition: width 0.3s ease;
+    }
+    .container { padding: 0 1rem 6rem; }
     .field {
       display: flex;
       align-items: center;
+      background: var(--field-bg);
       border-left: 4px solid var(--accent);
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       padding: 0.75rem;
       margin: 0.5rem 0;
       border-radius: 8px;
     }
-    label { flex:2; font-weight:300; font-size:1rem; }
-    .duration { flex:1; text-align:center; font-weight:600; color: rgba(0,0,0,0.6); }
-    input[type=time] { flex:1; text-align:right; font-size:1rem; }
-    .buttons { flex:1; display:flex; justify-content:flex-end; gap:0.3rem; }
+    .field.past { opacity: 0.6; }
+    .field.current {
+      background: var(--accent);
+      color: #fff;
+    }
+    .field.current input,
+    .field.current .duration { color: #fff; }
+    .icon { margin-right: 0.5rem; }
+    label { flex: 2; font-weight: 600; display: flex; align-items: center; }
+    .duration { flex: 1; text-align: center; font-weight: 600; color: rgba(0,0,0,0.6); }
+    input[type=time] { flex: 1; text-align: right; font-size: 1rem; background: none; border: none; color: inherit; }
+    details summary {
+      font-weight: 600;
+      cursor: pointer;
+      margin: 0.5rem 0;
+      list-style: none;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    .buttons { flex: 1; display: flex; justify-content: flex-end; gap: 0.3rem; }
     .btn {
       background: none;
       border: none;
       font-size: 1.2rem;
       padding: 0.3rem;
       border-radius: 4px;
+      color: inherit;
     }
     .btn:hover { background: rgba(0,0,0,0.1); cursor: pointer; }
-
     footer {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: #fff;
-      padding: 0.75rem 1rem;
+      background: var(--field-bg);
+      padding: 1.5rem 1rem;
       box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
-      font-size: 1rem;
+      font-size: 1.2rem;
       text-align: center;
     }
-    footer span { font-weight:600; color: var(--accent); }
+    footer span { font-weight: 600; color: var(--accent); }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>DaySync</h1>
     <p>Tap times, Reset 🔄 or Now 🕒 to recalc your day</p>
+    <div class="progress-bar"><div class="progress"></div></div>
   </div>
   <div class="container" id="fields"></div>
   <footer id="summary"></footer>
 
   <script>
+    const iconsMap = {
+      'Wake Up':'⏰','Morning Walk':'🚶','Decompression':'🧘‍♂️','Corrective':'💪',
+      'Workout':'🏃','Smoothie & Shower':'🚿','Leave for Coffee':'☕',
+      'Work Block 1':'💼','Work Block 2':'💼','Work Block 3':'💼','Work Block 4':'💼',
+      'Personal Start':'🏁','Leave for Dinner':'🚗','Dinner':'🍽️','Evening Walk':'🚶‍♂️',
+      'Free Time':'🎉','Shower':'🚿','Meditation':'🧘','In Bed':'🛏️','Sleep By':'🌙'
+    };
     const events = [
       { name: 'Wake Up', duration:30, buffer:0 },
       { name: 'Morning Walk', duration:30, buffer:0 },
@@ -90,6 +142,7 @@
 
     const container = document.getElementById('fields');
     const summaryEl = document.getElementById('summary');
+    const progressEl = document.querySelector('.progress');
     let times = [], defaultTimes = [];
 
     function minutesToHHMM(m) {
@@ -98,38 +151,80 @@
       const mm = String(m%60).padStart(2,'0');
       return `${hh}:${mm}`;
     }
-
+    function formatTime12(m) {
+      m = (m + 24*60) % (24*60);
+      let hh = Math.floor(m/60), mm = m%60;
+      const ampm = hh >= 12 ? 'PM' : 'AM';
+      hh = hh % 12 || 12;
+      return `${hh}:${String(mm).padStart(2,'0')} ${ampm}`;
+    }
+    function formatDuration(mins) {
+      if (mins < 60) return mins + 'm';
+      const h = Math.floor(mins/60), m = mins % 60;
+      return m ? `${h}h ${m}m` : `${h}h`;
+    }
     function recalc(startIdx=0) {
       for (let i = startIdx + 1; i < events.length; i++) {
         const prev = events[i-1];
         times[i] = times[i-1] + prev.duration + events[i].buffer;
         inputs[i].value = minutesToHHMM(times[i]);
       }
+      updateShading();
       updateSummary();
+      updateProgress();
     }
-
+    function updateShading() {
+      const nowMin = new Date().getHours()*60 + new Date().getMinutes();
+      inputs.forEach((input, i) => {
+        const field = input.closest('.field');
+        const start = times[i], end = start + events[i].duration;
+        field.classList.remove('past','current','future');
+        if (nowMin >= end) field.classList.add('past');
+        else if (nowMin >= start && nowMin < end) field.classList.add('current');
+        else field.classList.add('future');
+      });
+    }
     function updateSummary() {
-      const now = new Date();
-      const curMin = now.getHours()*60 + now.getMinutes();
-      let idx = events.findIndex((_,i) => times[i] > curMin);
-      if (idx === -1 || idx >= events.length-1) {
+      const nowMin = new Date().getHours()*60 + new Date().getMinutes();
+      const idx = events.findIndex((_,i) => times[i] > nowMin);
+      if (idx === -1 || idx >= events.length) {
         summaryEl.textContent = 'All tasks complete';
       } else {
-        summaryEl.innerHTML = `Next: <span>${events[idx].name}</span> at <span>${minutesToHHMM(times[idx])}</span>`;
+        summaryEl.innerHTML = `Next: <span>${events[idx].name}</span> at <span>${formatTime12(times[idx])}</span>`;
       }
     }
+    function updateProgress() {
+      const nowMin = new Date().getHours()*60 + new Date().getMinutes();
+      const total = times[times.length-1] - times[0];
+      const elapsed = Math.min(Math.max(nowMin - times[0], 0), total);
+      const pct = (elapsed/total)*100;
+      progressEl.style.width = pct + '%';
+    }
 
-    const inputs = events.map((evt,i) => {
+    const inputs = [];
+    let inGroup = false, detailsEl;
+    for (let i = 0; i < events.length; i++) {
+      if (i === 7) {
+        detailsEl = document.createElement('details');
+        detailsEl.open = true;
+        detailsEl.innerHTML = '<summary>Work Sessions</summary>';
+        container.appendChild(detailsEl);
+        inGroup = true;
+      }
+      const parent = inGroup ? detailsEl : container;
+      const evt = events[i];
       const field = document.createElement('div'); field.className = 'field';
-      const label = document.createElement('label'); label.textContent = evt.name;
-      const dur = document.createElement('div'); dur.className = 'duration'; dur.textContent = evt.duration + 'm';
+      const label = document.createElement('label');
+      label.innerHTML = `<span class="icon">${iconsMap[evt.name] || ''}</span>${evt.name}`;
+      const dur = document.createElement('div'); dur.className = 'duration'; dur.textContent = formatDuration(evt.duration);
       const input = document.createElement('input'); input.type = 'time'; input.step = 60;
       const buttons = document.createElement('div'); buttons.className = 'buttons';
       const resetBtn = document.createElement('button'); resetBtn.className = 'btn'; resetBtn.textContent = '🔄';
       const nowBtn = document.createElement('button'); nowBtn.className = 'btn'; nowBtn.textContent = '🕒';
       buttons.append(resetBtn, nowBtn);
       field.append(label, dur, input, buttons);
-      container.appendChild(field);
+      parent.appendChild(field);
+      inputs.push(input);
 
       input.addEventListener('change', () => {
         const [h,m] = input.value.split(':').map(Number);
@@ -142,15 +237,12 @@
         recalc(i);
       });
       nowBtn.addEventListener('click', () => {
-        const now = new Date();
-        const mins = now.getHours()*60 + now.getMinutes();
-        times[i] = mins;
-        input.value = minutesToHHMM(mins);
-        recalc(i);
+        const now = new Date(); const mins = now.getHours()*60 + now.getMinutes();
+        times[i] = mins; input.value = minutesToHHMM(mins); recalc(i);
       });
 
-      return input;
-    });
+      if (i === 10) inGroup = false;
+    }
 
     // Initialize defaults
     times[0] = 7*60; inputs[0].value = minutesToHHMM(times[0]);
@@ -158,6 +250,7 @@
     inputs[1].value = minutesToHHMM(times[1]);
     recalc(1);
     defaultTimes = [...times];
+    setInterval(() => { updateShading(); updateSummary(); updateProgress(); }, 60000);
   </script>
 </body>
 </html>
