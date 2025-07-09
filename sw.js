@@ -1,7 +1,6 @@
 const CACHE_NAME = 'daysync-cache-v3';
 const URLsToCache = ['.', 'index.html', 'manifest.json'];
 
-// Install: cache new assets and immediately skip waiting
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
@@ -10,7 +9,6 @@ self.addEventListener('install', e => {
   );
 });
 
-// Activate: remove old caches, take control
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -21,7 +19,6 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: serve from cache, fallback to network
 self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request))
