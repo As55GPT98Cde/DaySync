@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>DaySync</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#3367D6">
+  <style>
+    :root { --accent: #3367D6; }
+    body { margin:0; font-family:-apple-system, BlinkMacSystemFont, sans-serif; color:#333; }
+    .header {
+      background: var(--accent);
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header h1 { margin:0; font-size:1.5rem; }
+    .header p { margin:0.2rem 0 1rem; font-size:0.9rem; color: rgba(255,255,255,0.8); }
+
+    .container { padding: 0 1rem 4rem; }
+    .field {
+      display: flex;
+      align-items: center;
+      border-left: 4px solid var(--accent);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border-radius: 8px;
+    }
+    label { flex:2; font-weight:300; font-size:1rem; }
+    .duration { flex:1; text-align:center; font-weight:600; color: rgba(0,0,0,0.6); }
+    input[type=time] { flex:1; text-align:right; font-size:1rem; }
+    .buttons { flex:1; display:flex; justify-content:flex-end; gap:0.3rem; }
+    .btn {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      padding: 0.3rem;
+      border-radius: 4px;
+    }
+    .btn:hover { background: rgba(0,0,0,0.1); cursor: pointer; }
+
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+      font-size: 1rem;
+      text-align: center;
+    }
+    footer span { font-weight:600; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>DaySync</h1>
+    <p>Tap times, Reset 🔄 or Now 🕒 to recalc your day</p>
+  </div>
+  <div class="container" id="fields"></div>
+  <footer id="summary"></footer>
+
+  <script>
+    const events = [
+      { name: 'Wake Up', duration:30, buffer:0 },
+      { name: 'Morning Walk', duration:30, buffer:0 },
+      { name: 'Decompression', duration:20, buffer:10 },
+      { name: 'Corrective', duration:10, buffer:0 },
+      { name: 'Workout', duration:30, buffer:5 },
+      { name: 'Smoothie & Shower', duration:30, buffer:5 },
+      { name: 'Leave for Coffee', duration:25, buffer:10 },
+      { name: 'Work Block 1', duration:60, buffer:5 },
+      { name: 'Work Block 2', duration:60, buffer:5 },
+      { name: 'Work Block 3', duration:60, buffer:5 },
+      { name: 'Work Block 4', duration:60, buffer:5 },
+      { name: 'Personal Start', duration:60, buffer:5 },
+      { name: 'Leave for Dinner', duration:30, buffer:20 },
+      { name: 'Dinner', duration:60, buffer:0 },
+      { name: 'Evening Walk', duration:30, buffer:0 },
+      { name: 'Free Time', duration:150, buffer:0 },
+      { name: 'Shower', duration:30, buffer:0 },
+      { name: 'Meditation', duration:30, buffer:0 },
+      { name: 'In Bed', duration:30, buffer:0 },
+      { name: 'Sleep By', duration:0, buffer:0 }
+    ];
+
+    const container = document.getElementById('fields');
+    const summaryEl = document.getElementById('summary');
+    let times = [], defaultTimes = [];
+
+    function minutesToHHMM(m) {
+      m = (m + 24*60) % (24*60);
+      const hh = String(Math.floor(m/60)).padStart(2,'0');
+      const mm = String(m%60).padStart(2,'0');
+      return `${hh}:${mm}`;
+    }
+
+    function recalc(startIdx=0) {
+      for (let i = startIdx + 1; i < events.length; i++) {
+        const prev = events[i-1];
+        times[i] = times[i-1] + prev.duration + events[i].buffer;
+        inputs[i].value = minutesToHHMM(times[i]);
+      }
+      updateSummary();
+    }
+
+    function updateSummary() {
+      const now = new Date();
+      const curMin = now.getHours()*60 + now.getMinutes();
+      let idx = events.findIndex((_,i) => times[i] > curMin);
+      if (idx === -1 || idx >= events.length-1) {
+        summaryEl.textContent = 'All tasks complete';
+      } else {
+        summaryEl.innerHTML = `Next: <span>${events[idx].name}</span> at <span>${minutesToHHMM(times[idx])}</span>`;
+      }
+    }
+
+    const inputs = events.map((evt,i) => {
+      const field = document.createElement('div'); field.className = 'field';
+      const label = document.createElement('label'); label.textContent = evt.name;
+      const dur = document.createElement('div'); dur.className = 'duration'; dur.textContent = evt.duration + 'm';
+      const input = document.createElement('input'); input.type = 'time'; input.step = 60;
+      const buttons = document.createElement('div'); buttons.className = 'buttons';
+      const resetBtn = document.createElement('button'); resetBtn.className = 'btn'; resetBtn.textContent = '🔄';
+      const nowBtn = document.createElement('button'); nowBtn.className = 'btn'; nowBtn.textContent = '🕒';
+      buttons.append(resetBtn, nowBtn);
+      field.append(label, dur, input, buttons);
+      container.appendChild(field);
+
+      input.addEventListener('change', () => {
+        const [h,m] = input.value.split(':').map(Number);
+        times[i] = h*60 + m;
+        recalc(i);
+      });
+      resetBtn.addEventListener('click', () => {
+        times[i] = defaultTimes[i];
+        inputs[i].value = minutesToHHMM(times[i]);
+        recalc(i);
+      });
+      nowBtn.addEventListener('click', () => {
+        const now = new Date();
+        const mins = now.getHours()*60 + now.getMinutes();
+        times[i] = mins;
+        input.value = minutesToHHMM(mins);
+        recalc(i);
+      });
+
+      return input;
+    });
+
+    // Initialize defaults
+    times[0] = 7*60; inputs[0].value = minutesToHHMM(times[0]);
+    times[1] = times[0] + events[0].duration + events[1].buffer;
+    inputs[1].value = minutesToHHMM(times[1]);
+    recalc(1);
+    defaultTimes = [...times];
+  </script>
+</body>
+</html>
